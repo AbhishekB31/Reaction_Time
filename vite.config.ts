@@ -19,5 +19,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     // Emit the production build into /docs so GitHub Pages can serve it directly
     outDir: "docs",
+    // Disable source maps in production to avoid 404s for src/*.tsx on GH Pages
+    sourcemap: false,
   },
 }));
