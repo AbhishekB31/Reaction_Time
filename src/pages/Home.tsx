@@ -17,9 +17,9 @@ const Home = () => {
 
   // Ensure both GIFs start playing at the same time
   useEffect(() => {
-    const reverseFlashImg = document.querySelector('img[src="/Reverse-Flash.gif"]') as HTMLImageElement;
-    const flashyFlashImg = document.querySelector('img[src="/flashyflash.gif"]') as HTMLImageElement;
-    
+    const reverseFlashImg = document.getElementById("reverse-flash-gif") as HTMLImageElement | null;
+    const flashyFlashImg = document.getElementById("flashy-flash-gif") as HTMLImageElement | null;
+
     if (reverseFlashImg && flashyFlashImg) {
       // Force reload both images to restart animations
       reverseFlashImg.src = reverseFlashImg.src;
@@ -85,7 +85,8 @@ const Home = () => {
       {/* Reverse Flash Background Image */}
       <div className="absolute -left-28 top-32 w-1/2 h-full opacity-100 pointer-events-none">
         <img 
-          src={`${base}Reverse-Flash.gif`} 
+          id="reverse-flash-gif"
+          src={`${base}Reverse-Flash.gif?v=2`} 
           alt="Reverse Flash" 
           className="w-full h-full object-cover object-left-bottom"
         />
@@ -94,7 +95,8 @@ const Home = () => {
       {/* FlashyFlash Background Image */}
       <div className="absolute -right-28 top-32 w-1/2 h-full opacity-100 pointer-events-none">
         <img 
-          src={`${base}flashyflash.gif`} 
+          id="flashy-flash-gif"
+          src={`${base}flashyflash.gif?v=2`} 
           alt="FlashyFlash" 
           className="w-full h-full object-cover object-right-bottom scale-125"
         />
