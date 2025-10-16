@@ -1,4 +1,4 @@
-# Reaction Time — Flash Edition
+# Reaction Time — (https://abhishekb31.github.io/Reaction_Time/)
 
 A fast, single-try visual reaction test with a Flash/Reverse-Flash themed UI. Click (or press SPACE/ENTER) the moment the panel turns green. Results are saved to a public leaderboard powered by Supabase.
 
