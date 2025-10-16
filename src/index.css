@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Deep space dark theme */
+    --background: 222 48% 5%;
+    --foreground: 220 15% 97%;
+
+    --card: 220 35% 8%;
+    --card-foreground: 220 15% 97%;
+
+    --popover: 220 35% 8%;
+    --popover-foreground: 220 15% 97%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 220 15% 97%;
+
+    --secondary: 220 20% 15%;
+    --secondary-foreground: 220 15% 97%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 217 91% 60%;
+    --accent-foreground: 220 15% 97%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 15% 97%;
+
+    --border: 220 25% 20%;
+    --input: 220 25% 20%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Reaction test state colors */
+    --state-idle: 220 15% 40%;
+    --state-wait: 0 73% 52%;
+    --state-go: 142 71% 45%;
+    --state-result: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
