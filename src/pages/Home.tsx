@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Timer, TrendingUp } from "lucide-react";
@@ -11,6 +12,7 @@ const Home = () => {
   const base = import.meta.env.BASE_URL || "/";
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [beepEnabled, setBeepEnabled] = useState<boolean>(true);
   const navigate = useNavigate();
 
   // Ensure both GIFs start playing at the same time
@@ -24,6 +26,19 @@ const Home = () => {
       flashyFlashImg.src = flashyFlashImg.src;
     }
   }, []);
+
+  // Load persisted beep preference
+  useEffect(() => {
+    const stored = localStorage.getItem("beepEnabled");
+    if (stored !== null) {
+      setBeepEnabled(stored !== "false");
+    }
+  }, []);
+
+  const toggleBeep = (value: boolean) => {
+    setBeepEnabled(value);
+    localStorage.setItem("beepEnabled", value ? "true" : "false");
+  };
 
   const validateName = (value: string): boolean => {
     const trimmed = value.trim();
@@ -125,7 +140,13 @@ const Home = () => {
                 {isLoading ? "Starting..." : "Play"}
               </Button>
             </form>
-            <div className="mt-6 pt-6 border-t border-border">
+            <div className="mt-6 pt-6 border-t border-border space-y-4">
+              {/* Beep sound setting */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Beep sound</span>
+                <Switch checked={beepEnabled} onCheckedChange={toggleBeep} />
+              </div>
+
               <Button
                 variant="ghost"
                 className="w-full"

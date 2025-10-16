@@ -43,10 +43,11 @@ const Play = () => {
     const timeoutId = window.setTimeout(() => {
       setGoTime(performance.now());
       setGameState("go");
-      // Play a short beep when the green state appears
+      // Play a short beep when the green state appears, if enabled
       try {
+        const beepEnabled = (localStorage.getItem("beepEnabled") ?? "true") !== "false";
         const ctx = audioCtxRef.current;
-        if (ctx) {
+        if (beepEnabled && ctx) {
           const durationMs = 150;
           const oscillator = ctx.createOscillator();
           const gain = ctx.createGain();
