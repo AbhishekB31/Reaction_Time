@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const Consent = () => {
@@ -14,45 +13,19 @@ const Consent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionValid, setSessionValid] = useState(false);
   const navigate = useNavigate();
-  const sessionId = searchParams.get("session");
+  const name = searchParams.get("name");
 
   useEffect(() => {
     const validateSession = async () => {
-      if (!sessionId) {
+      if (!name) {
         navigate("/");
         return;
       }
-
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("completed")
-        .eq("id", sessionId)
-        .maybeSingle();
-
-      if (error || !data) {
-        toast({
-          title: "Invalid session",
-          description: "Session not found. Please start again.",
-          variant: "destructive",
-        });
-        navigate("/");
-        return;
-      }
-
-      if (data.completed === 1) {
-        toast({
-          title: "Session already completed",
-          description: "This session has already been completed.",
-        });
-        navigate("/");
-        return;
-      }
-
       setSessionValid(true);
     };
 
     validateSession();
-  }, [sessionId, navigate]);
+  }, [name, navigate]);
 
   const handleContinue = async () => {
     if (!agreed) {
@@ -67,14 +40,7 @@ const Consent = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase
-        .from("sessions")
-        .update({ consent_given: 1 })
-        .eq("id", sessionId);
-
-      if (error) throw error;
-
-      navigate(`/play?session=${sessionId}`);
+      navigate(`/play?name=${encodeURIComponent(name!)}`);
     } catch (error) {
       console.error("Error updating consent:", error);
       toast({

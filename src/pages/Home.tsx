@@ -1,16 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Timer, TrendingUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { createPlayerOrError } from "@/lib/data";
 
 const Home = () => {
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Ensure both GIFs start playing at the same time
+  useEffect(() => {
+    const reverseFlashImg = document.querySelector('img[src="/Reverse-Flash.gif"]') as HTMLImageElement;
+    const flashyFlashImg = document.querySelector('img[src="/flashyflash.gif"]') as HTMLImageElement;
+    
+    if (reverseFlashImg && flashyFlashImg) {
+      // Force reload both images to restart animations
+      reverseFlashImg.src = reverseFlashImg.src;
+      flashyFlashImg.src = flashyFlashImg.src;
+    }
+  }, []);
 
   const validateName = (value: string): boolean => {
     const trimmed = value.trim();
@@ -35,49 +47,13 @@ const Home = () => {
     setIsLoading(true);
 
     try {
-      // Check if participant exists, or create new one
-      let { data: existingParticipant, error: fetchError } = await supabase
-        .from("participants")
-        .select("id")
-        .eq("name", trimmedName)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
-      let participantId: string;
-
-      if (existingParticipant) {
-        participantId = existingParticipant.id;
-      } else {
-        const { data: newParticipant, error: insertError } = await supabase
-          .from("participants")
-          .insert({ name: trimmedName })
-          .select("id")
-          .single();
-
-        if (insertError) throw insertError;
-        participantId = newParticipant.id;
-      }
-
-      // Create session
-      const sessionId = crypto.randomUUID();
-      const { error: sessionError } = await supabase
-        .from("sessions")
-        .insert({
-          id: sessionId,
-          participant_id: participantId,
-          consent_given: 0,
-          completed: 0,
-        });
-
-      if (sessionError) throw sessionError;
-
-      navigate(`/consent?session=${sessionId}`);
+      await createPlayerOrError(trimmedName);
+      navigate(`/consent?name=${encodeURIComponent(trimmedName)}`);
     } catch (error) {
-      console.error("Error starting session:", error);
+      console.error("Error creating player:", error);
       toast({
         title: "Error",
-        description: "Failed to start session. Please try again.",
+        description: (error as any)?.message || "Failed to save player. Check Supabase setup.",
         variant: "destructive",
       });
     } finally {
@@ -86,8 +62,29 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div
+      className="h-screen flex items-center justify-center relative overflow-hidden bg-cover bg-center"
+      style={{ backgroundImage: 'url(/BG.png)' }}
+    >
+      {/* Reverse Flash Background Image */}
+      <div className="absolute -left-28 top-32 w-1/2 h-full opacity-100 pointer-events-none">
+        <img 
+          src="/Reverse-Flash.gif" 
+          alt="Reverse Flash" 
+          className="w-full h-full object-cover object-left-bottom"
+        />
+      </div>
+      
+      {/* FlashyFlash Background Image */}
+      <div className="absolute -right-28 top-32 w-1/2 h-full opacity-100 pointer-events-none">
+        <img 
+          src="/flashyflash.gif" 
+          alt="FlashyFlash" 
+          className="w-full h-full object-cover object-right-bottom scale-125"
+        />
+      </div>
+      
+      <div className="w-full max-w-md space-y-6 relative z-10">
         <Card className="border-border/50 shadow-2xl">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">

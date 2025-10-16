@@ -1,0 +1,1 @@
+{\n  PORT: 5000,\n  DB_PATH: reaction.db,\n  ADMIN_TOKEN: supersecret123\n}

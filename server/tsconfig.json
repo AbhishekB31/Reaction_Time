@@ -1,0 +1,1 @@
+{\n  compilerOptions: {\n    target: es2021,\n    module: esnext,\n    moduleResolution: bundler,\n    outDir: dist,\n    strict: true,\n    esModuleInterop: true\n  },\n  include: [./*.ts]\n}

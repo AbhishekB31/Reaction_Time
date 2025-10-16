@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import ThankYouDialog from "@/components/ThankYouDialog";
+import { submitScore } from "@/lib/data";
 
 type GameState = "idle" | "wait" | "go" | "too-soon" | "result";
 
@@ -14,74 +14,79 @@ const Play = () => {
   const [reactionTime, setReactionTime] = useState<number | null>(null);
   const [goTime, setGoTime] = useState<number>(0);
   const [showDialog, setShowDialog] = useState(false);
+  const waitTimeoutRef = useRef<number | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const navigate = useNavigate();
-  const sessionId = searchParams.get("session");
+  const name = searchParams.get("name");
 
   useEffect(() => {
     const validateSession = async () => {
-      if (!sessionId) {
+      if (!name) {
         navigate("/");
         return;
       }
-
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("consent_given, completed")
-        .eq("id", sessionId)
-        .maybeSingle();
-
-      if (error || !data) {
-        toast({
-          title: "Invalid session",
-          description: "Session not found.",
-          variant: "destructive",
-        });
-        navigate("/");
-        return;
-      }
-
-      if (data.consent_given !== 1) {
-        toast({
-          title: "Consent required",
-          description: "Please complete the consent form first.",
-        });
-        navigate(`/consent?session=${sessionId}`);
-        return;
-      }
-
-      if (data.completed === 1) {
-        toast({
-          title: "Already completed",
-          description: "This session has already been completed.",
-        });
-        navigate("/");
-        return;
-      }
-
       setSessionValid(true);
     };
 
     validateSession();
-  }, [sessionId, navigate]);
+  }, [name, navigate]);
 
   const startTest = useCallback(() => {
+    // Clear any existing wait timeout before starting a new one
+    if (waitTimeoutRef.current) {
+      clearTimeout(waitTimeoutRef.current);
+      waitTimeoutRef.current = null;
+    }
     setGameState("wait");
-    const delay = 800 + Math.random() * 1200; // 800-2000ms
+    const delay = 800 + Math.random() * 4200; // 800-5000ms
     
-    setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       setGoTime(performance.now());
       setGameState("go");
+      // Play a short beep when the green state appears
+      try {
+        // Lazily create AudioContext on first user interaction
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx && ctx.state === "suspended") {
+          // Some browsers require resume after a user gesture
+          ctx.resume().catch(() => {});
+        }
+        if (ctx) {
+          const durationMs = 150;
+          const oscillator = ctx.createOscillator();
+          const gain = ctx.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(880, ctx.currentTime); // 880 Hz beep
+          gain.gain.setValueAtTime(0.001, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+          oscillator.connect(gain).connect(ctx.destination);
+          oscillator.start();
+          oscillator.stop(ctx.currentTime + durationMs / 1000 + 0.01);
+        }
+      } catch (_) {
+        // Ignore audio errors to avoid impacting gameplay
+      }
     }, delay);
+    waitTimeoutRef.current = timeoutId;
   }, []);
 
   const handleAction = useCallback(async () => {
     if (gameState === "idle" || gameState === "too-soon") {
       startTest();
     } else if (gameState === "wait") {
+      // Clicked too early: show message briefly, then go back to idle (Click to start)
+      if (waitTimeoutRef.current) {
+        clearTimeout(waitTimeoutRef.current);
+        waitTimeoutRef.current = null;
+      }
       setGameState("too-soon");
-      setTimeout(() => {
+      window.setTimeout(() => {
         setGameState("idle");
-      }, 1500);
+      }, 1000);
     } else if (gameState === "go") {
       const rt = Math.round(performance.now() - goTime);
       setReactionTime(rt);
@@ -89,42 +94,7 @@ const Play = () => {
 
       // Submit to database
       try {
-        const ua = navigator.userAgent;
-        const screenW = window.screen.width;
-        const screenH = window.screen.height;
-        const rtClean = rt < 80 || rt > 2000 ? null : rt;
-
-        // Update session with device info
-        await supabase
-          .from("sessions")
-          .update({
-            user_agent: ua.substring(0, 300),
-            screen_w: screenW,
-            screen_h: screenH,
-            completed: 1,
-          })
-          .eq("id", sessionId);
-
-        // Insert trial
-        await supabase
-          .from("trials")
-          .insert({
-            session_id: sessionId!,
-            trial_index: 1,
-            rt_ms_raw: rt,
-            rt_ms_clean: rtClean,
-          });
-
-        // Insert or update summary
-        await supabase
-          .from("summaries")
-          .upsert({
-            session_id: sessionId!,
-            best_ms: rt,
-            median_ms: rt,
-            mean_ms: rt,
-          });
-
+        await submitScore(name!, rt);
         setShowDialog(true);
       } catch (error) {
         console.error("Error submitting result:", error);
@@ -135,7 +105,7 @@ const Play = () => {
         });
       }
     }
-  }, [gameState, goTime, sessionId, startTest]);
+  }, [gameState, goTime, name, startTest]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -148,6 +118,16 @@ const Play = () => {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [handleAction]);
+
+  // Cleanup any pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (waitTimeoutRef.current) {
+        clearTimeout(waitTimeoutRef.current);
+        waitTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   if (!sessionValid) {
     return null;
@@ -204,8 +184,8 @@ const Play = () => {
                 onClick={handleAction}
                 disabled={gameState === "result"}
                 className={`
-                  w-full min-h-[280px] rounded-xl flex items-center justify-center
-                  text-3xl font-bold transition-all duration-200
+                  w-full min-h-[360px] rounded-2xl flex items-center justify-center
+                  text-4xl font-bold transition-all duration-200
                   ${getStateColor()}
                   ${gameState === "result" ? "cursor-default" : "cursor-pointer hover:brightness-110"}
                   focus:outline-none focus:ring-4 focus:ring-primary/50

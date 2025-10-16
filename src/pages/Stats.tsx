@@ -3,15 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Home, Medal, Award, Pen } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchLeaderboard, deletePlayer, LeaderboardRow } from "@/lib/data";
 
-interface LeaderboardEntry {
-  name: string;
-  best_ms: number;
-  median_ms: number;
-  mean_ms: number;
-  session_count: number;
-}
+type LeaderboardEntry = LeaderboardRow;
 
 const Stats = () => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -22,58 +16,7 @@ const Stats = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch all completed sessions with participant names and summaries
-        const { data, error } = await supabase
-          .from("sessions")
-          .select(`
-            id,
-            participant_id,
-            participants!inner(name),
-            summaries!inner(best_ms, median_ms, mean_ms)
-          `)
-          .eq("completed", 1);
-
-        if (error) throw error;
-
-        // Group by participant name and compute stats
-        const statsMap = new Map<string, { times: number[]; best: number }>();
-
-        data?.forEach((session: any) => {
-          const name = session.participants.name;
-          const bestMs = session.summaries.best_ms;
-
-          if (!statsMap.has(name)) {
-            statsMap.set(name, { times: [], best: bestMs });
-          }
-
-          const entry = statsMap.get(name)!;
-          entry.times.push(bestMs);
-          entry.best = Math.min(entry.best, bestMs);
-        });
-
-        // Convert to leaderboard entries
-        const entries: LeaderboardEntry[] = Array.from(statsMap.entries()).map(
-          ([name, stats]) => {
-            const sorted = [...stats.times].sort((a, b) => a - b);
-            const median =
-              sorted.length % 2 === 0
-                ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-                : sorted[Math.floor(sorted.length / 2)];
-            const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
-
-            return {
-              name,
-              best_ms: stats.best,
-              median_ms: Math.round(median),
-              mean_ms: Math.round(mean),
-              session_count: sorted.length,
-            };
-          }
-        );
-
-        // Sort by best time (fastest first)
-        entries.sort((a, b) => a.best_ms - b.best_ms);
-
+        const entries = await fetchLeaderboard();
         setLeaderboard(entries);
       } catch (error) {
         console.error("Error fetching stats:", error);
@@ -85,112 +28,17 @@ const Stats = () => {
     fetchStats();
   }, []);
 
-  const removePerson = async (name: string) => {
+  const removePerson = async (player_id: string, name: string) => {
     if (!confirm(`Are you sure you want to remove ${name} from the leaderboard?`)) {
       return;
     }
 
     try {
-      // Get participant ID
-      const { data: participant, error: fetchError } = await supabase
-        .from("participants")
-        .select("id")
-        .eq("name", name)
-        .single();
-
-      if (fetchError) {
-        console.error("Error fetching participant:", fetchError);
-        alert("Failed to find participant. Please try again.");
-        return;
-      }
-
-      if (!participant) {
-        alert("Participant not found.");
-        return;
-      }
-
-      // Delete participant (this will cascade delete sessions, trials, and summaries due to foreign key constraints)
-      console.log("Attempting to delete participant:", participant.id);
-      const { error: deleteError } = await supabase
-        .from("participants")
-        .delete()
-        .eq("id", participant.id);
-
-      if (deleteError) {
-        console.error("Error deleting participant:", deleteError);
-        console.error("Delete error details:", JSON.stringify(deleteError, null, 2));
-        alert(`Failed to remove person. Error: ${deleteError.message}. This might be due to database permissions. Please contact the administrator.`);
-        return;
-      }
-
-      console.log("Successfully deleted participant:", participant.id);
-
-      // Refresh the leaderboard by refetching data
-      const fetchStats = async () => {
-        try {
-          const { data, error } = await supabase
-            .from("sessions")
-            .select(`
-              id,
-              participant_id,
-              participants!inner(name),
-              summaries!inner(best_ms, median_ms, mean_ms)
-            `)
-            .eq("completed", 1);
-
-          if (error) throw error;
-
-          const statsMap = new Map<string, { times: number[]; best: number }>();
-
-          data?.forEach((session: any) => {
-            const name = session.participants.name;
-            const bestMs = session.summaries.best_ms;
-
-            if (!statsMap.has(name)) {
-              statsMap.set(name, { times: [], best: bestMs });
-            }
-
-            const entry = statsMap.get(name)!;
-            entry.times.push(bestMs);
-            entry.best = Math.min(entry.best, bestMs);
-          });
-
-          const entries: LeaderboardEntry[] = Array.from(statsMap.entries()).map(
-            ([name, stats]) => {
-              const sorted = [...stats.times].sort((a, b) => a - b);
-              const median =
-                sorted.length % 2 === 0
-                  ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-                  : sorted[Math.floor(sorted.length / 2)];
-              const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
-
-              return {
-                name,
-                best_ms: stats.best,
-                median_ms: Math.round(median),
-                mean_ms: Math.round(mean),
-                session_count: sorted.length,
-              };
-            }
-          );
-
-          entries.sort((a, b) => a.best_ms - b.best_ms);
-          setLeaderboard(entries);
-          
-          // Check if the person was actually removed
-          const personStillExists = entries.some(entry => entry.name === name);
-          if (!personStillExists) {
-            alert(`${name} has been removed from the leaderboard.`);
-          } else {
-            alert(`Failed to remove ${name}. The person is still in the leaderboard.`);
-          }
-        } catch (error) {
-          console.error("Error refreshing stats:", error);
-          alert("Failed to refresh leaderboard after removal attempt.");
-        }
-      };
-
-      await fetchStats();
+      await deletePlayer(player_id, { soft: true });
+      
+      // Remove from local state
+      setLeaderboard(prev => prev.filter(entry => entry.player_id !== player_id));
+      alert(`${name} has been removed from the leaderboard.`);
     } catch (error) {
       console.error("Error removing person:", error);
       alert("Failed to remove person. Please try again.");
@@ -246,7 +94,7 @@ const Stats = () => {
                 No results yet. Be the first to play!
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className={`space-y-3 ${leaderboard.length > 5 ? "max-h-96 overflow-y-auto pr-1" : ""}`}>
                 {leaderboard.map((entry, index) => (
                   <div
                     key={`${entry.name}-${index}`}
@@ -267,12 +115,7 @@ const Stats = () => {
                         <div>
                           <div className="font-semibold text-lg">{entry.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {entry.session_count > 1 && (
-                              <>
-                                median {entry.median_ms} ms · mean {entry.mean_ms} ms ·{" "}
-                              </>
-                            )}
-                            {entry.session_count} {entry.session_count === 1 ? "try" : "tries"}
+                            mean {entry.mean_ms} ms · {entry.tries} {entry.tries === 1 ? "try" : "tries"}
                           </div>
                         </div>
                       </div>
@@ -285,7 +128,7 @@ const Stats = () => {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => removePerson(entry.name)}
+                            onClick={() => removePerson(entry.player_id, entry.name)}
                             className="w-8 h-8 rounded-full p-0"
                           >
                             ×
