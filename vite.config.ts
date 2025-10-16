@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Required for GitHub Pages under /Reaction_Time
+  base: "/Reaction_Time/",
   server: {
     host: "::",
     port: 8080
@@ -14,5 +16,9 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  build: {
+    // Emit the production build into /docs so GitHub Pages can serve it directly
+    outDir: "docs",
   },
 }));

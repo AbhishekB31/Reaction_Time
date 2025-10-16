@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { createPlayerOrError } from "@/lib/data";
 
 const Home = () => {
+  const base = import.meta.env.BASE_URL || "/";
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -64,12 +65,12 @@ const Home = () => {
   return (
     <div
       className="h-screen flex items-center justify-center relative overflow-hidden bg-cover bg-center"
-      style={{ backgroundImage: 'url(/BG.png)' }}
+      style={{ backgroundImage: `url(${base}BG.png)` }}
     >
       {/* Reverse Flash Background Image */}
       <div className="absolute -left-28 top-32 w-1/2 h-full opacity-100 pointer-events-none">
         <img 
-          src="/Reverse-Flash.gif" 
+          src={`${base}Reverse-Flash.gif`} 
           alt="Reverse Flash" 
           className="w-full h-full object-cover object-left-bottom"
         />
@@ -78,7 +79,7 @@ const Home = () => {
       {/* FlashyFlash Background Image */}
       <div className="absolute -right-28 top-32 w-1/2 h-full opacity-100 pointer-events-none">
         <img 
-          src="/flashyflash.gif" 
+          src={`${base}flashyflash.gif`} 
           alt="FlashyFlash" 
           className="w-full h-full object-cover object-right-bottom scale-125"
         />
