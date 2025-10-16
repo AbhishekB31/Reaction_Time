@@ -45,15 +45,7 @@ const Play = () => {
       setGameState("go");
       // Play a short beep when the green state appears
       try {
-        // Lazily create AudioContext on first user interaction
-        if (!audioCtxRef.current) {
-          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
         const ctx = audioCtxRef.current;
-        if (ctx && ctx.state === "suspended") {
-          // Some browsers require resume after a user gesture
-          ctx.resume().catch(() => {});
-        }
         if (ctx) {
           const durationMs = 150;
           const oscillator = ctx.createOscillator();
@@ -76,6 +68,18 @@ const Play = () => {
 
   const handleAction = useCallback(async () => {
     if (gameState === "idle" || gameState === "too-soon") {
+      // Ensure AudioContext is created/resumed during a user gesture
+      try {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx && ctx.state === "suspended") {
+          await ctx.resume().catch(() => {});
+        }
+      } catch (_) {
+        // Ignore audio errors; gameplay should continue even if audio fails
+      }
       startTest();
     } else if (gameState === "wait") {
       // Clicked too early: show message briefly, then go back to idle (Click to start)
