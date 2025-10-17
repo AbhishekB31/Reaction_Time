@@ -29,9 +29,9 @@ A fast, single-try visual reaction test with a Flash/Reverse-Flash themed UI. Cl
 
 1) Install dependencies
 
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
 2) Environment
 
@@ -46,9 +46,9 @@ VITE_DELETE_FN_URL=https://<project-ref>.supabase.co/functions/v1/delete-player
 
 3) Run the app
 
-```bash
-npm run dev
-```
+   ```bash
+   npm run dev
+   ```
 
 The app will start on http://localhost:8080 (or another free port).
 

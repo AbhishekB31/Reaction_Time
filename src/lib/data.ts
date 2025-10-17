@@ -88,7 +88,7 @@ const FN_URL =
   import.meta.env.VITE_DELETE_FN_URL ??
   'https://yoqmkqqsojewrqwdjdnn.supabase.co/functions/v1/delete-player';
 
-export async function deletePlayer(player_id: string, { soft = true } = {}) {
+export async function deletePlayer(player_id: string, { soft = false } = {}) {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     'x-admin-token': import.meta.env.VITE_ADMIN_TOKEN!,
@@ -105,6 +105,128 @@ export async function deletePlayer(player_id: string, { soft = true } = {}) {
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+
+// 60s Reaction overview (4 columns): name, total_clicks, best_ms, avg_ms
+export async function fetchLB_RT60_Overview() {
+  try {
+    const { data, error } = await supa
+      .from("lb_rt60_overview")
+      .select("*")
+      .order("total_clicks", { ascending: false });
+    if (error) throw error;
+    return data as {
+      player_id: string;
+      name: string;
+      total_clicks: number;
+      best_ms: number | null;
+      avg_ms: number | null;
+    }[];
+  } catch (error) {
+    console.warn("RT60 overview view not found or error:", error);
+    return [];
+  }
+}
+
+// CPS overview (3 columns): name, best_cps, avg_cps
+export async function fetchLB_CPS_Overview() {
+  try {
+    const { data, error } = await supa
+      .from("lb_cps_overview")
+      .select("*")
+      .order("best_cps", { ascending: false });
+    if (error) throw error;
+    return data as {
+      player_id: string;
+      name: string;
+      best_cps: number | null;
+      avg_cps: number | null;
+    }[];
+  } catch (error) {
+    console.warn("CPS overview view not found or error:", error);
+    return [];
+  }
+}
+
+
+/** Find or create a player by name, returns player_id */
+export async function getOrCreatePlayerId(name: string) {
+  const n = name.trim();
+  try {
+    // First try to find existing player
+    const { data: existing, error: findError } = await supa
+      .from("players")
+      .select("id")
+      .eq("name", n)
+      .eq("deleted", false)
+      .maybeSingle();
+    
+    if (findError) throw findError;
+    
+    if (existing?.id) {
+      return existing.id as string;
+    }
+    
+    // If not found, create new player
+    const { data, error } = await supa
+      .from("players")
+      .insert({ name: n })
+      .select("id")
+      .single();
+    
+    if (error) throw error;
+    return data.id as string;
+  } catch (error) {
+    console.warn("Failed to get/create player:", error);
+    // Return a fallback ID for now
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+
+/** Save a finished 60s Reaction session */
+export async function submitRT60Session(name: string, stats: {
+  totalClicks: number;
+  bestMs: number | null;
+  avgMs: number | null;
+}) {
+  try {
+    const player_id = await getOrCreatePlayerId(name);
+    const { error } = await supa.from("rt60_sessions").insert({
+      player_id,
+      total_clicks: stats.totalClicks,
+      best_ms: stats.bestMs,
+      avg_ms: stats.avgMs
+    });
+    if (error) throw error;
+    console.log("RT60 session saved successfully");
+  } catch (error) {
+    console.warn("Failed to save RT60 session (table may not exist):", error);
+    // Don't throw - just log the warning
+  }
+}
+
+/** Save a finished CPS 4×10s session */
+export async function submitCPSSession(name: string, payload: {
+  set1: number; set2: number; set3: number; set4: number;
+  durationSec?: number; // default 10 if not provided
+}) {
+  try {
+    const player_id = await getOrCreatePlayerId(name);
+    const { error } = await supa.from("cps_sessions").insert({
+      player_id,
+      set1_clicks: payload.set1,
+      set2_clicks: payload.set2,
+      set3_clicks: payload.set3,
+      set4_clicks: payload.set4,
+      duration_sec: payload.durationSec ?? 10
+    });
+    if (error) throw error;
+    console.log("CPS session saved successfully");
+  } catch (error) {
+    console.warn("Failed to save CPS session (table may not exist):", error);
+    // Don't throw - just log the warning
+  }
 }
 
 

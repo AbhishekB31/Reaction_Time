@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import ThankYouDialog from "@/components/ThankYouDialog";
 import { submitScore } from "@/lib/data";
 
 type GameState = "idle" | "wait" | "go" | "too-soon" | "result";
@@ -13,7 +13,7 @@ const Play = () => {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [reactionTime, setReactionTime] = useState<number | null>(null);
   const [goTime, setGoTime] = useState<number>(0);
-  const [showDialog, setShowDialog] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   const waitTimeoutRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const navigate = useNavigate();
@@ -83,14 +83,14 @@ const Play = () => {
       }
       startTest();
     } else if (gameState === "wait") {
-      // Clicked too early: show message briefly, then go back to idle (Click to start)
+      // Clicked too early: show message briefly, then restart wait cycle
       if (waitTimeoutRef.current) {
         clearTimeout(waitTimeoutRef.current);
         waitTimeoutRef.current = null;
       }
       setGameState("too-soon");
       window.setTimeout(() => {
-        setGameState("idle");
+        startTest(); // Restart the wait cycle
       }, 1000);
     } else if (gameState === "go") {
       const rt = Math.round(performance.now() - goTime);
@@ -100,7 +100,7 @@ const Play = () => {
       // Submit to database
       try {
         await submitScore(name!, rt);
-        setShowDialog(true);
+        setShowResults(true);
       } catch (error) {
         console.error("Error submitting result:", error);
         toast({
@@ -138,20 +138,34 @@ const Play = () => {
     return null;
   }
 
+  function restartTest() {
+    setShowResults(false);
+    setReactionTime(null);
+    setGameState("idle");
+    if (waitTimeoutRef.current) {
+      clearTimeout(waitTimeoutRef.current);
+      waitTimeoutRef.current = null;
+    }
+  }
+
+  function exitToModes() {
+    navigate(`/modes?name=${encodeURIComponent(name!)}`);
+  }
+
   const getStateColor = () => {
     switch (gameState) {
       case "idle":
-        return "bg-[hsl(var(--state-idle))]";
+        return "bg-gray-700 text-gray-300";
       case "wait":
-        return "bg-[hsl(var(--state-wait))]";
+        return "bg-red-500 text-white";
       case "go":
-        return "bg-[hsl(var(--state-go))]";
+        return "bg-green-500 text-white";
       case "too-soon":
-        return "bg-[hsl(var(--state-wait))]";
+        return "bg-red-500 text-white";
       case "result":
-        return "bg-[hsl(var(--state-result))]";
+        return "bg-gray-700 text-gray-300";
       default:
-        return "bg-muted";
+        return "bg-gray-700 text-gray-300";
     }
   };
 
@@ -173,52 +187,65 @@ const Play = () => {
   };
 
   return (
-    <>
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-3xl">
-          <Card className="border-border/50 shadow-2xl">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold">Reaction Test — 1 try</CardTitle>
-              <CardDescription className="text-base">
-                Press <kbd className="px-2 py-1 bg-muted rounded text-xs">SPACE</kbd> or click/tap
-                when the box turns green
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <button
-                onClick={handleAction}
-                disabled={gameState === "result"}
-                className={`
-                  w-full min-h-[360px] rounded-2xl flex items-center justify-center
-                  text-4xl font-bold transition-all duration-200
-                  ${getStateColor()}
-                  ${gameState === "result" ? "cursor-default" : "cursor-pointer hover:brightness-110"}
-                  focus:outline-none focus:ring-4 focus:ring-primary/50
-                `}
-              >
-                {getStateText()}
-              </button>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-3xl">
+        <Card className="border-border/50 shadow-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Reaction Test — 1 try</CardTitle>
+            <CardDescription className="text-base">
+              Player: <b>{name}</b> • Press <kbd className="px-2 py-1 bg-muted rounded text-xs">SPACE</kbd> or click/tap when the box turns green
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <button
+              onClick={handleAction}
+              disabled={showResults}
+              className={`
+                w-full min-h-[360px] rounded-2xl flex items-center justify-center
+                text-4xl font-bold transition-all duration-200
+                ${getStateColor()}
+                ${showResults ? "cursor-default" : "cursor-pointer hover:brightness-110"}
+                focus:outline-none focus:ring-4 focus:ring-primary/50
+              `}
+            >
+              {getStateText()}
+            </button>
 
-              <div className="text-center text-sm text-muted-foreground space-y-2">
-                <p>
-                  {gameState === "idle" && "Click the panel above to begin"}
-                  {gameState === "wait" && "Wait for green..."}
-                  {gameState === "go" && "React now!"}
-                  {gameState === "too-soon" && "You clicked too early"}
-                  {gameState === "result" && "Test complete"}
-                </p>
+            <div className="text-center text-sm text-muted-foreground space-y-2">
+            {!showResults && (
+              <p>
+                {gameState === "idle" && "Click the panel above to begin"}
+                {gameState === "wait" && "Wait for green..."}
+                {gameState === "go" && "React now!"}
+                {gameState === "too-soon" && "You clicked too early"}
+                {gameState === "result" && "Test complete"}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-4">
+            <Button onClick={restartTest} variant="outline" className="flex-1">
+              Restart
+            </Button>
+            <Button onClick={exitToModes} className="flex-1">
+              Exit
+            </Button>
+          </div>
+
+          {showResults && reactionTime && (
+            <div className="space-y-4">
+              <div className="text-center p-6 bg-muted/30 rounded-lg">
+                <h3 className="text-xl font-semibold mb-4">Test Complete!</h3>
+                <div className="text-lg">
+                  <p><strong>Reaction Time:</strong> {reactionTime} ms</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          )}
+          </CardContent>
+        </Card>
       </div>
-
-      <ThankYouDialog
-        open={showDialog}
-        reactionTime={reactionTime || 0}
-        onClose={() => navigate("/")}
-      />
-    </>
+    </div>
   );
 };
 

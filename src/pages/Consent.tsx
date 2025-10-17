@@ -40,7 +40,7 @@ const Consent = () => {
     setIsLoading(true);
 
     try {
-      navigate(`/play?name=${encodeURIComponent(name!)}`);
+      navigate(`/modes?name=${encodeURIComponent(name!)}`);
     } catch (error) {
       console.error("Error updating consent:", error);
       toast({
