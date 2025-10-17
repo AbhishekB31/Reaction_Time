@@ -40,6 +40,12 @@ jobs:
       
       - name: Build
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://yoqmkqqsojewrqwdjdnn.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvcW1rcXFzb2pld3Jxd2RqZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NDc0NTMsImV4cCI6MjA3NjEyMzQ1M30.hvrawq8wz_A_R2hz7L98LcZ_HBkoMLGkJpwL9NRt8zQ
+          VITE_ADMIN_TOKEN: supersecret123
+          VITE_DELETE_FN_URL: https://yoqmkqqsojewrqwdjdnn.supabase.co/functions/v1/delete-player
+          VITE_DELETE_USE_AUTH: false
       
       - name: Setup Pages
         uses: actions/configure-pages@v5
